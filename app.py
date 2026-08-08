@@ -14,7 +14,6 @@ import customtkinter as ctk
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import export_to_excel, export_generic, read_excel
-from filter_utils import determine_filterable_columns
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -444,7 +443,7 @@ class App(ctk.CTk):
     # =====================================================================
     def _build_browse_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(2, weight=1)
+        parent.grid_rowconfigure(5, weight=1)
 
         top_bar = ctk.CTkFrame(parent, fg_color="transparent")
         top_bar.grid(row=0, column=0, sticky="we", padx=16, pady=(16, 0))
@@ -456,25 +455,42 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(
             parent,
-            text="Upload any .xlsx — a dropdown filter is auto-built for each column with a small set of repeated values.",
+            text="Add conditions to filter to rows where a column equals a specific value. Combine as many as you like.",
             font=ctk.CTkFont(size=10),
             text_color="gray50",
         ).grid(row=1, column=0, sticky="w", padx=16, pady=(6, 0))
 
-        self.browse_filter_bar = ctk.CTkFrame(parent, fg_color="transparent")
-        self.browse_filter_bar.grid(row=1, column=0, sticky="we", padx=16, pady=(28, 8))
+        text_bar = ctk.CTkFrame(parent, fg_color="transparent")
+        text_bar.grid(row=2, column=0, sticky="we", padx=16, pady=(10, 0))
+        self.browse_text_var = ctk.StringVar()
+        self.browse_text_var.trace_add("write", lambda *_: self._apply_browse_filters())
+        ctk.CTkEntry(
+            text_bar, textvariable=self.browse_text_var, placeholder_text="Filter (any column)...", width=260
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(text_bar, text="Clear all filters", width=120, command=self._clear_browse_filters).pack(
+            side="left"
+        )
+        self.browse_row_count_label = ctk.CTkLabel(text_bar, text="0 rows", text_color="gray60")
+        self.browse_row_count_label.pack(side="right")
+
+        self.browse_conditions_container = ctk.CTkFrame(parent, fg_color="transparent")
+        self.browse_conditions_container.grid(row=3, column=0, sticky="we", padx=16, pady=(8, 0))
+
+        ctk.CTkButton(parent, text="+ Add condition", width=140, command=self._add_browse_condition).grid(
+            row=4, column=0, sticky="w", padx=16, pady=(4, 0)
+        )
 
         table_frame = ctk.CTkFrame(parent, fg_color="#111827")
-        table_frame.grid(row=2, column=0, sticky="nswe", padx=16, pady=(0, 8))
+        table_frame.grid(row=5, column=0, sticky="nswe", padx=16, pady=(8, 8))
         self.browse_tree = self._make_scrollable_tree(table_frame, [], [])
 
         bottom_bar = ctk.CTkFrame(parent, fg_color="transparent")
-        bottom_bar.grid(row=3, column=0, sticky="we", padx=16, pady=(0, 16))
+        bottom_bar.grid(row=6, column=0, sticky="we", padx=16, pady=(0, 16))
         ctk.CTkButton(bottom_bar, text="Export visible rows to Excel", command=self._export_browse_results).pack(
             side="left"
         )
-        self.browse_row_count_label = ctk.CTkLabel(bottom_bar, text="0 rows", text_color="gray60")
-        self.browse_row_count_label.pack(side="right")
+
+        self.browse_conditions = []  # list of {"column": str, "value": str}
 
     def _upload_excel(self):
         filepath = filedialog.askopenfilename(
@@ -495,10 +511,12 @@ class App(ctk.CTk):
 
         self.browse_columns = columns
         self.browse_all_rows = rows
+        self.browse_conditions = []
+        self.browse_text_var.set("")
         self.browse_file_label.configure(text=f"{os.path.basename(filepath)} ({len(rows)} rows)")
 
         self._rebuild_browse_table_columns(columns)
-        self._rebuild_browse_filters(columns, rows)
+        self._render_browse_conditions()
         self._apply_browse_filters()
 
     def _rebuild_browse_table_columns(self, columns):
@@ -509,50 +527,74 @@ class App(ctk.CTk):
             width = min(max(len(col) * 9, 100), 260)
             self.browse_tree.column(col, width=width, anchor="w")
 
-    def _rebuild_browse_filters(self, columns, rows):
-        for child in self.browse_filter_bar.winfo_children():
+    def _unique_values_for_column(self, col):
+        return sorted({str(r.get(col, "")).strip() for r in self.browse_all_rows if str(r.get(col, "")).strip()})
+
+    def _add_browse_condition(self):
+        if not self.browse_columns:
+            return
+        default_col = self.browse_columns[0]
+        vals = self._unique_values_for_column(default_col)
+        self.browse_conditions.append({"column": default_col, "value": vals[0] if vals else ""})
+        self._render_browse_conditions()
+        self._apply_browse_filters()
+
+    def _render_browse_conditions(self):
+        for child in self.browse_conditions_container.winfo_children():
             child.destroy()
-        self.browse_filter_vars = {}
 
-        self.browse_text_var = ctk.StringVar()
-        self.browse_text_var.trace_add("write", lambda *_: self._apply_browse_filters())
-        ctk.CTkEntry(
-            self.browse_filter_bar,
-            textvariable=self.browse_text_var,
-            placeholder_text="Filter (any column)...",
-            width=220,
-        ).pack(side="left", padx=(0, 8))
+        for i, cond in enumerate(self.browse_conditions):
+            row = ctk.CTkFrame(self.browse_conditions_container, fg_color="transparent")
+            row.pack(fill="x", pady=(0, 6))
 
-        for col, unique_vals in determine_filterable_columns(columns, rows):
-            all_label = f"All ({col})"
-            var = ctk.StringVar(value=all_label)
+            col_var = ctk.StringVar(value=cond["column"])
+
+            def on_col_change(choice, i=i):
+                self.browse_conditions[i]["column"] = choice
+                vals = self._unique_values_for_column(choice)
+                self.browse_conditions[i]["value"] = vals[0] if vals else ""
+                self._render_browse_conditions()
+                self._apply_browse_filters()
+
             ctk.CTkOptionMenu(
-                self.browse_filter_bar,
-                values=[all_label] + unique_vals,
-                variable=var,
-                width=150,
-                command=lambda *_: self._apply_browse_filters(),
+                row, values=self.browse_columns, variable=col_var, width=170, command=on_col_change
             ).pack(side="left", padx=(0, 8))
-            self.browse_filter_vars[col] = (var, all_label)
 
-        ctk.CTkButton(
-            self.browse_filter_bar, text="Clear filters", width=100, command=self._clear_browse_filters
-        ).pack(side="left")
+            unique_vals = self._unique_values_for_column(cond["column"])
+            current_val = cond["value"] if cond["value"] in unique_vals else (unique_vals[0] if unique_vals else "")
+            cond["value"] = current_val
+            val_var = ctk.StringVar(value=current_val)
+
+            def on_val_change(choice, i=i):
+                self.browse_conditions[i]["value"] = choice
+                self._apply_browse_filters()
+
+            ctk.CTkOptionMenu(
+                row, values=unique_vals or [""], variable=val_var, width=170, command=on_val_change
+            ).pack(side="left", padx=(0, 8))
+
+            def on_remove(i=i):
+                self.browse_conditions.pop(i)
+                self._render_browse_conditions()
+                self._apply_browse_filters()
+
+            ctk.CTkButton(
+                row, text="✕", width=28, fg_color="#4B5563", hover_color="#374151", command=on_remove
+            ).pack(side="left")
 
     def _clear_browse_filters(self):
         self.browse_text_var.set("")
-        for _col, (var, all_label) in self.browse_filter_vars.items():
-            var.set(all_label)
+        self.browse_conditions = []
+        self._render_browse_conditions()
         self._apply_browse_filters()
 
     def _apply_browse_filters(self):
         text = self.browse_text_var.get().strip().lower()
         rows = self.browse_all_rows
 
-        for col, (var, all_label) in self.browse_filter_vars.items():
-            selected = var.get()
-            if selected != all_label:
-                rows = [r for r in rows if str(r.get(col, "")).strip() == selected]
+        for cond in self.browse_conditions:
+            if cond["column"] and cond["value"]:
+                rows = [r for r in rows if str(r.get(cond["column"], "")).strip() == cond["value"]]
 
         if text:
             rows = [

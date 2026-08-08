@@ -77,19 +77,20 @@ search) and **Browse Excel** (upload any spreadsheet and filter it by column).
 ## 3. Browse Excel tab
 
 Click **Upload Excel...** and pick any `.xlsx` file — leads you exported
-earlier, or any other spreadsheet. The app reads its header row and:
+earlier, or any other spreadsheet. The app reads its header row and builds
+the results table with whatever columns that file has (not fixed to the
+leads schema).
 
-- builds the results table with whatever columns that file has (not fixed
-  to the leads schema);
-- auto-generates a dropdown filter for each column that has a small set of
-  repeated values (e.g. City, Status, Country) — columns that are mostly
-  unique per row (like Email or a full Address) are left out of the
-  dropdowns since a filter wouldn't be useful there, but they're still
-  covered by the free-text search box, which matches across every column;
-- shows up to 5 dropdown filters at once, picking the lowest-cardinality
-  columns first.
+Filter it with:
 
-Combine the dropdowns and free-text search (all applied together), then
+- **Conditions** — click **+ Add condition** to get a column dropdown and a
+  value dropdown (only that column's actual values, so you can't pick a
+  combination that doesn't exist); stack as many conditions as you like,
+  they combine with AND. Each condition has a **✕** to remove just that one.
+- **Free-text search** — matches across every column at once, on top of
+  whatever conditions are set.
+
+Combine conditions and free-text search (all applied together), then
 **Export visible rows to Excel** to save just the filtered subset — handy
 for slicing a big leads file down before importing it into a CRM or mail
 tool.
@@ -168,8 +169,6 @@ protection rules depending on where your contacts are located.
 - `app.py` — desktop UI (Search tab + Browse Excel tab), customtkinter + tkinter.
 - `streamlit_app.py` — browser UI, same two sections, same backend — run with
   `streamlit run streamlit_app.py`.
-- `filter_utils.py` — shared logic for auto-picking which uploaded columns
-  get a dropdown filter; used by both UIs.
 - `batch_scrape.py` — headless CLI for running a sweep of searches at once.
 - `overpass_api.py` — free OSM-based search client (Nominatim + Overpass).
 - `places_api.py` / `config.py` — optional Google Places (New) client, unused
