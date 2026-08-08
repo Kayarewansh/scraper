@@ -14,7 +14,7 @@ import customtkinter as ctk
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import export_to_excel, export_generic, read_excel
-from condition_utils import CONDITION_OPERATORS, row_matches
+from condition_utils import CONDITION_OPERATORS, row_matches, is_numeric_column
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -535,9 +535,13 @@ class App(ctk.CTk):
         if not self.browse_columns:
             return
         default_col = self.browse_columns[0]
-        vals = self._unique_values_for_column(default_col)
+        if is_numeric_column(self.browse_all_rows, default_col):
+            default_val = ""
+        else:
+            vals = self._unique_values_for_column(default_col)
+            default_val = vals[0] if vals else ""
         self.browse_conditions.append(
-            {"column": default_col, "operator": CONDITION_OPERATORS[0], "value": vals[0] if vals else ""}
+            {"column": default_col, "operator": CONDITION_OPERATORS[0], "value": default_val}
         )
         self._render_browse_conditions()
         self._apply_browse_filters()
@@ -554,8 +558,11 @@ class App(ctk.CTk):
 
             def on_col_change(choice, i=i):
                 self.browse_conditions[i]["column"] = choice
-                vals = self._unique_values_for_column(choice)
-                self.browse_conditions[i]["value"] = vals[0] if vals else ""
+                if is_numeric_column(self.browse_all_rows, choice):
+                    self.browse_conditions[i]["value"] = ""
+                else:
+                    vals = self._unique_values_for_column(choice)
+                    self.browse_conditions[i]["value"] = vals[0] if vals else ""
                 self._render_browse_conditions()
                 self._apply_browse_filters()
 
@@ -573,18 +580,30 @@ class App(ctk.CTk):
                 row, values=CONDITION_OPERATORS, variable=op_var, width=150, command=on_op_change
             ).pack(side="left", padx=(0, 8))
 
-            unique_vals = self._unique_values_for_column(cond["column"])
-            current_val = cond["value"] if cond["value"] in unique_vals else (unique_vals[0] if unique_vals else "")
-            cond["value"] = current_val
-            val_var = ctk.StringVar(value=current_val)
+            if is_numeric_column(self.browse_all_rows, cond["column"]):
+                val_var = ctk.StringVar(value=cond["value"])
 
-            def on_val_change(choice, i=i):
-                self.browse_conditions[i]["value"] = choice
-                self._apply_browse_filters()
+                def on_val_typed(*_args, i=i, var=val_var):
+                    self.browse_conditions[i]["value"] = var.get()
+                    self._apply_browse_filters()
 
-            ctk.CTkOptionMenu(
-                row, values=unique_vals or [""], variable=val_var, width=150, command=on_val_change
-            ).pack(side="left", padx=(0, 8))
+                val_var.trace_add("write", on_val_typed)
+                ctk.CTkEntry(row, textvariable=val_var, width=150, placeholder_text="Enter a number").pack(
+                    side="left", padx=(0, 8)
+                )
+            else:
+                unique_vals = self._unique_values_for_column(cond["column"])
+                current_val = cond["value"] if cond["value"] in unique_vals else (unique_vals[0] if unique_vals else "")
+                cond["value"] = current_val
+                val_var = ctk.StringVar(value=current_val)
+
+                def on_val_change(choice, i=i):
+                    self.browse_conditions[i]["value"] = choice
+                    self._apply_browse_filters()
+
+                ctk.CTkOptionMenu(
+                    row, values=unique_vals or [""], variable=val_var, width=150, command=on_val_change
+                ).pack(side="left", padx=(0, 8))
 
             def on_remove(i=i):
                 self.browse_conditions.pop(i)

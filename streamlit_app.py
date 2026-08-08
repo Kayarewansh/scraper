@@ -15,7 +15,7 @@ import streamlit as st
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import COLUMNS as LEADS_COLUMNS, export_to_excel, export_generic, read_excel, leads_workbook_bytes, generic_workbook_bytes
-from condition_utils import CONDITION_OPERATORS, row_matches
+from condition_utils import CONDITION_OPERATORS, row_matches, is_numeric_column
 
 LEADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "leads")
 os.makedirs(LEADS_DIR, exist_ok=True)
@@ -203,10 +203,14 @@ with tab_browse:
                                        index=CONDITION_OPERATORS.index(cond["operator"]) if cond.get("operator") in CONDITION_OPERATORS else 0)
             conditions[i]["operator"] = op_choice
 
-            unique_vals = sorted({str(r.get(col_choice, "")).strip() for r in rows if str(r.get(col_choice, "")).strip()})
-            val_index = unique_vals.index(cond["value"]) if cond.get("value") in unique_vals else 0
-            val_choice = cc3.selectbox("Value", unique_vals, key=f"cond_val_{i}", index=val_index if unique_vals else 0)
-            conditions[i]["value"] = val_choice if unique_vals else None
+            if is_numeric_column(rows, col_choice):
+                val_choice = cc3.text_input("Value (number)", value=str(cond.get("value") or ""), key=f"cond_val_{i}")
+                conditions[i]["value"] = val_choice if val_choice.strip() else None
+            else:
+                unique_vals = sorted({str(r.get(col_choice, "")).strip() for r in rows if str(r.get(col_choice, "")).strip()})
+                val_index = unique_vals.index(cond["value"]) if cond.get("value") in unique_vals else 0
+                val_choice = cc3.selectbox("Value", unique_vals, key=f"cond_val_{i}", index=val_index if unique_vals else 0)
+                conditions[i]["value"] = val_choice if unique_vals else None
 
             cc4.markdown("<br>", unsafe_allow_html=True)
             if cc4.button("✕", key=f"cond_remove_{i}"):

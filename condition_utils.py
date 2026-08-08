@@ -10,6 +10,27 @@ CONDITION_OPERATORS = [
     "Less than",
 ]
 
+NUMERIC_THRESHOLD = 0.8  # fraction of non-empty values that must parse as a number
+
+
+def is_numeric_column(rows: list, column: str) -> bool:
+    """True if most of a column's non-empty values look like numbers — used
+    to decide whether the Value field should be a free-typed number input
+    (so you can filter on a threshold that isn't already in the data, e.g.
+    "Revenue > 250000") or a dropdown of existing values. A few stray
+    non-numeric entries (blanks, "N/A") don't flip the column to text."""
+    non_empty = [str(r.get(column, "")).strip() for r in rows if str(r.get(column, "")).strip()]
+    if not non_empty:
+        return False
+    numeric_count = 0
+    for v in non_empty:
+        try:
+            float(v)
+            numeric_count += 1
+        except ValueError:
+            pass
+    return (numeric_count / len(non_empty)) >= NUMERIC_THRESHOLD
+
 
 def row_matches(row: dict, column: str, operator: str, value) -> bool:
     """True if `row[column]` satisfies `operator` against `value`. Numeric

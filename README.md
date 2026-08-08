@@ -83,13 +83,16 @@ leads schema).
 
 Filter it with:
 
-- **Conditions** — click **+ Add condition** to get three dropdowns: **Column**,
-  **Condition** (Equals, Not equals, Contains, Does not contain, Greater than,
-  Less than), and **Value** (that column's actual values, so you can't pick a
-  combination that doesn't exist). Greater/Less than compare numerically and
-  just won't match on a non-numeric column rather than erroring. Stack as many
-  conditions as you like — they combine with AND. Each has a **✕** to remove
-  just that one.
+- **Conditions** — click **+ Add condition** to get **Column**, **Condition**
+  (Equals, Not equals, Contains, Does not contain, Greater than, Less than),
+  and **Value**. The Value field adapts to the column's data: a text-column
+  (like City or Status) gets a dropdown of that column's actual values, so
+  you can't pick a combination that doesn't exist; a numeric-looking column
+  (like Revenue) gets a free-typed number box instead, so you can filter on
+  a threshold that isn't already in the data (e.g. "Revenue > 250000" even
+  if no row is exactly 250000). Greater/Less than just won't match on a
+  non-numeric column rather than erroring. Stack as many conditions as you
+  like — they combine with AND. Each has a **✕** to remove just that one.
 - **Free-text search** — matches across every column at once, on top of
   whatever conditions are set.
 
