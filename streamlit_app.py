@@ -15,6 +15,7 @@ import streamlit as st
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import COLUMNS as LEADS_COLUMNS, export_to_excel, export_generic, read_excel, leads_workbook_bytes, generic_workbook_bytes
+from condition_utils import CONDITION_OPERATORS, row_matches
 
 LEADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "leads")
 os.makedirs(LEADS_DIR, exist_ok=True)
@@ -188,23 +189,27 @@ with tab_browse:
 
         text_query = st.text_input("Filter (any column)", key="browse_text_filter")
 
-        st.markdown("**Conditions** — filter to rows where a column equals a specific value. Combine as many as you like.")
+        st.markdown("**Conditions** — filter to rows matching a column/condition/value. Combine as many as you like.")
         conditions = st.session_state.setdefault("browse_conditions", [])
 
         remove_idx = None
         for i, cond in enumerate(conditions):
-            cc1, cc2, cc3 = st.columns([3, 3, 1])
+            cc1, cc2, cc3, cc4 = st.columns([3, 3, 3, 1])
             col_choice = cc1.selectbox("Column", columns, key=f"cond_col_{i}",
                                         index=columns.index(cond["column"]) if cond.get("column") in columns else 0)
             conditions[i]["column"] = col_choice
 
+            op_choice = cc2.selectbox("Condition", CONDITION_OPERATORS, key=f"cond_op_{i}",
+                                       index=CONDITION_OPERATORS.index(cond["operator"]) if cond.get("operator") in CONDITION_OPERATORS else 0)
+            conditions[i]["operator"] = op_choice
+
             unique_vals = sorted({str(r.get(col_choice, "")).strip() for r in rows if str(r.get(col_choice, "")).strip()})
             val_index = unique_vals.index(cond["value"]) if cond.get("value") in unique_vals else 0
-            val_choice = cc2.selectbox("Value", unique_vals, key=f"cond_val_{i}", index=val_index if unique_vals else 0)
+            val_choice = cc3.selectbox("Value", unique_vals, key=f"cond_val_{i}", index=val_index if unique_vals else 0)
             conditions[i]["value"] = val_choice if unique_vals else None
 
-            cc3.markdown("<br>", unsafe_allow_html=True)
-            if cc3.button("✕", key=f"cond_remove_{i}"):
+            cc4.markdown("<br>", unsafe_allow_html=True)
+            if cc4.button("✕", key=f"cond_remove_{i}"):
                 remove_idx = i
 
         if remove_idx is not None:
@@ -214,13 +219,13 @@ with tab_browse:
         if st.button("+ Add condition"):
             default_col = columns[0]
             default_vals = sorted({str(r.get(default_col, "")).strip() for r in rows if str(r.get(default_col, "")).strip()})
-            conditions.append({"column": default_col, "value": default_vals[0] if default_vals else None})
+            conditions.append({"column": default_col, "operator": "Equals", "value": default_vals[0] if default_vals else None})
             st.rerun()
 
         filtered_rows = rows
         for cond in conditions:
             if cond.get("column") and cond.get("value") is not None:
-                filtered_rows = [r for r in filtered_rows if str(r.get(cond["column"], "")).strip() == cond["value"]]
+                filtered_rows = [r for r in filtered_rows if row_matches(r, cond["column"], cond["operator"], cond["value"])]
         if text_query.strip():
             q = text_query.strip().lower()
             filtered_rows = [r for r in filtered_rows if q in " ".join(str(r.get(c, "")) for c in columns).lower()]

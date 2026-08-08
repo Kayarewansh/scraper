@@ -83,10 +83,13 @@ leads schema).
 
 Filter it with:
 
-- **Conditions** — click **+ Add condition** to get a column dropdown and a
-  value dropdown (only that column's actual values, so you can't pick a
-  combination that doesn't exist); stack as many conditions as you like,
-  they combine with AND. Each condition has a **✕** to remove just that one.
+- **Conditions** — click **+ Add condition** to get three dropdowns: **Column**,
+  **Condition** (Equals, Not equals, Contains, Does not contain, Greater than,
+  Less than), and **Value** (that column's actual values, so you can't pick a
+  combination that doesn't exist). Greater/Less than compare numerically and
+  just won't match on a non-numeric column rather than erroring. Stack as many
+  conditions as you like — they combine with AND. Each has a **✕** to remove
+  just that one.
 - **Free-text search** — matches across every column at once, on top of
   whatever conditions are set.
 
@@ -169,6 +172,8 @@ protection rules depending on where your contacts are located.
 - `app.py` — desktop UI (Search tab + Browse Excel tab), customtkinter + tkinter.
 - `streamlit_app.py` — browser UI, same two sections, same backend — run with
   `streamlit run streamlit_app.py`.
+- `condition_utils.py` — the Browse Excel condition operators (Equals,
+  Contains, Greater than, etc.), shared by both UIs.
 - `batch_scrape.py` — headless CLI for running a sweep of searches at once.
 - `overpass_api.py` — free OSM-based search client (Nominatim + Overpass).
 - `places_api.py` / `config.py` — optional Google Places (New) client, unused

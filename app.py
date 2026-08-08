@@ -14,6 +14,7 @@ import customtkinter as ctk
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import export_to_excel, export_generic, read_excel
+from condition_utils import CONDITION_OPERATORS, row_matches
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -535,7 +536,9 @@ class App(ctk.CTk):
             return
         default_col = self.browse_columns[0]
         vals = self._unique_values_for_column(default_col)
-        self.browse_conditions.append({"column": default_col, "value": vals[0] if vals else ""})
+        self.browse_conditions.append(
+            {"column": default_col, "operator": CONDITION_OPERATORS[0], "value": vals[0] if vals else ""}
+        )
         self._render_browse_conditions()
         self._apply_browse_filters()
 
@@ -557,7 +560,17 @@ class App(ctk.CTk):
                 self._apply_browse_filters()
 
             ctk.CTkOptionMenu(
-                row, values=self.browse_columns, variable=col_var, width=170, command=on_col_change
+                row, values=self.browse_columns, variable=col_var, width=150, command=on_col_change
+            ).pack(side="left", padx=(0, 8))
+
+            op_var = ctk.StringVar(value=cond.get("operator", CONDITION_OPERATORS[0]))
+
+            def on_op_change(choice, i=i):
+                self.browse_conditions[i]["operator"] = choice
+                self._apply_browse_filters()
+
+            ctk.CTkOptionMenu(
+                row, values=CONDITION_OPERATORS, variable=op_var, width=150, command=on_op_change
             ).pack(side="left", padx=(0, 8))
 
             unique_vals = self._unique_values_for_column(cond["column"])
@@ -570,7 +583,7 @@ class App(ctk.CTk):
                 self._apply_browse_filters()
 
             ctk.CTkOptionMenu(
-                row, values=unique_vals or [""], variable=val_var, width=170, command=on_val_change
+                row, values=unique_vals or [""], variable=val_var, width=150, command=on_val_change
             ).pack(side="left", padx=(0, 8))
 
             def on_remove(i=i):
@@ -594,7 +607,7 @@ class App(ctk.CTk):
 
         for cond in self.browse_conditions:
             if cond["column"] and cond["value"]:
-                rows = [r for r in rows if str(r.get(cond["column"], "")).strip() == cond["value"]]
+                rows = [r for r in rows if row_matches(r, cond["column"], cond["operator"], cond["value"])]
 
         if text:
             rows = [
