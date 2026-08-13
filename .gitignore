@@ -5,3 +5,6 @@ __pycache__/
 config.json
 leads/
 .streamlit/secrets.toml
+build/
+dist/
+*.spec

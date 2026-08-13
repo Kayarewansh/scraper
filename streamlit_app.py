@@ -14,7 +14,7 @@ import streamlit as st
 
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
-from excel_export import COLUMNS as LEADS_COLUMNS, export_to_excel, export_generic, read_excel, leads_workbook_bytes, generic_workbook_bytes
+from excel_export import COLUMNS as LEADS_COLUMNS, export_to_excel, export_generic, read_table, leads_workbook_bytes, generic_workbook_bytes
 from condition_utils import CONDITION_OPERATORS, row_matches, is_numeric_column
 
 LEADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "leads")
@@ -31,17 +31,12 @@ tab_search, tab_browse = st.tabs(["Search", "Browse Excel"])
 # =====================================================================
 # SEARCH TAB
 # =====================================================================
-def run_search(keyword, location, max_results, require_website, require_phone, find_emails):
+def run_search(keyword, location, max_results, find_emails):
     status = st.empty()
     progress_bar = st.progress(0.0)
 
     client = OverpassClient()
     results = client.search(keyword, location, max_results, progress_callback=lambda m: status.caption(m))
-
-    if require_website:
-        results = [r for r in results if r["website"]]
-    if require_phone:
-        results = [r for r in results if r["phone"]]
 
     if find_emails:
         candidates = [r for r in results if r["website"]]
@@ -80,10 +75,7 @@ with tab_search:
     with col3:
         max_results = st.selectbox("Max results", [20, 40, 60], index=0)
 
-    c1, c2, c3 = st.columns(3)
-    require_website = c1.checkbox("Only results with a website")
-    require_phone = c2.checkbox("Only results with a phone number")
-    find_emails = c3.checkbox("Find emails from websites (slower)", value=True)
+    find_emails = st.checkbox("Find emails from websites (slower)", value=True)
 
     if st.button("Search", type="primary"):
         if not keyword.strip():
@@ -93,7 +85,7 @@ with tab_search:
         else:
             try:
                 st.session_state["search_results"] = run_search(
-                    keyword.strip(), location.strip(), max_results, require_website, require_phone, find_emails
+                    keyword.strip(), location.strip(), max_results, find_emails
                 )
             except OverpassError as e:
                 st.error(str(e))
@@ -161,13 +153,13 @@ with tab_search:
 # =====================================================================
 with tab_browse:
     st.caption(
-        "Upload any .xlsx — a dropdown filter is auto-built for each column with a small set of repeated values."
+        "Upload any .xlsx or .tsv — a dropdown filter is auto-built for each column with a small set of repeated values."
     )
 
-    uploaded = st.file_uploader("Upload Excel file", type=["xlsx"])
+    uploaded = st.file_uploader("Upload Excel or TSV file", type=["xlsx", "tsv"])
     if uploaded is not None:
         try:
-            columns, rows = read_excel(uploaded)
+            columns, rows = read_table(uploaded, filename=uploaded.name)
             if columns:
                 if uploaded.name != st.session_state.get("browse_filename"):
                     st.session_state["browse_conditions"] = []  # new file — old conditions may not apply
@@ -183,7 +175,7 @@ with tab_browse:
     rows = st.session_state.get("browse_rows", [])
 
     if not rows:
-        st.info("Upload an .xlsx file to get started.")
+        st.info("Upload an .xlsx or .tsv file to get started.")
     else:
         st.caption(f"Loaded {st.session_state.get('browse_filename', 'file')} — {len(rows)} rows, {len(columns)} columns.")
 

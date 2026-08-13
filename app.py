@@ -1,5 +1,5 @@
 """Lead Scraper — search OpenStreetMap for businesses (free, no API key),
-or upload any Excel file and filter it by column. Two tabs, one app.
+or upload any Excel/TSV file and filter it by column. Two tabs, one app.
 
 Run with:  python3 app.py
 """
@@ -13,7 +13,7 @@ import customtkinter as ctk
 
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
-from excel_export import export_to_excel, export_generic, read_excel
+from excel_export import export_to_excel, export_generic, read_table
 from condition_utils import CONDITION_OPERATORS, row_matches, is_numeric_column
 
 ctk.set_appearance_mode("dark")
@@ -148,20 +148,10 @@ class App(ctk.CTk):
             padx=16, pady=(4, 0), fill="x"
         )
 
-        self.require_website_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(
-            sidebar, text="Only results with a website", variable=self.require_website_var
-        ).pack(padx=16, pady=(14, 0), anchor="w")
-
-        self.require_phone_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(
-            sidebar, text="Only results with a phone number", variable=self.require_phone_var
-        ).pack(padx=16, pady=(8, 0), anchor="w")
-
         self.find_emails_var = ctk.BooleanVar(value=True)
         ctk.CTkCheckBox(
             sidebar, text="Find emails from websites (slower)", variable=self.find_emails_var
-        ).pack(padx=16, pady=(8, 0), anchor="w")
+        ).pack(padx=16, pady=(14, 0), anchor="w")
 
         self.search_button = ctk.CTkButton(sidebar, text="Search", command=self.start_search)
         self.search_button.pack(padx=16, pady=(18, 0), fill="x")
@@ -275,8 +265,6 @@ class App(ctk.CTk):
             return
 
         max_results = int(self.max_results_var.get())
-        require_website = self.require_website_var.get()
-        require_phone = self.require_phone_var.get()
         find_emails = self.find_emails_var.get()
 
         self.search_running = True
@@ -286,22 +274,17 @@ class App(ctk.CTk):
 
         thread = threading.Thread(
             target=self._run_search,
-            args=(keyword, location, max_results, require_website, require_phone, find_emails),
+            args=(keyword, location, max_results, find_emails),
             daemon=True,
         )
         thread.start()
 
-    def _run_search(self, keyword, location, max_results, require_website, require_phone, find_emails):
+    def _run_search(self, keyword, location, max_results, find_emails):
         try:
             client = OverpassClient()
             results = client.search(
                 keyword, location, max_results, progress_callback=lambda m: self.msg_queue.put(("status", m))
             )
-
-            if require_website:
-                results = [r for r in results if r["website"]]
-            if require_phone:
-                results = [r for r in results if r["phone"]]
 
             if find_emails:
                 candidates = [r for r in results if r["website"]]
@@ -448,7 +431,7 @@ class App(ctk.CTk):
 
         top_bar = ctk.CTkFrame(parent, fg_color="transparent")
         top_bar.grid(row=0, column=0, sticky="we", padx=16, pady=(16, 0))
-        ctk.CTkButton(top_bar, text="Upload Excel...", command=self._upload_excel).pack(side="left")
+        ctk.CTkButton(top_bar, text="Upload Excel/TSV...", command=self._upload_excel).pack(side="left")
         self.browse_file_label = ctk.CTkLabel(
             top_bar, text="No file loaded.", text_color="gray60"
         )
@@ -495,14 +478,14 @@ class App(ctk.CTk):
 
     def _upload_excel(self):
         filepath = filedialog.askopenfilename(
-            title="Upload Excel file",
-            filetypes=[("Excel workbook", "*.xlsx")],
+            title="Upload Excel or TSV file",
+            filetypes=[("Excel or TSV", "*.xlsx *.tsv"), ("Excel workbook", "*.xlsx"), ("TSV file", "*.tsv")],
             initialdir=LEADS_DIR,
         )
         if not filepath:
             return
         try:
-            columns, rows = read_excel(filepath)
+            columns, rows = read_table(filepath)
         except Exception as e:
             messagebox.showerror("Upload failed", str(e))
             return

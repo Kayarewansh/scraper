@@ -40,6 +40,25 @@ python3 app.py
 
 Opens a native window on your Mac.
 
+### Building a standalone .app (no Terminal needed)
+
+To get a double-clickable **Lead Scraper.app** you can launch from
+Launchpad/Spotlight like any other Mac app, instead of running `python3
+app.py` from Terminal each time:
+
+```bash
+cd ~/Desktop/scrapper
+source venv/bin/activate
+pip install pyinstaller
+pyinstaller --windowed --name "Lead Scraper" --noconfirm app.py
+cp -R "dist/Lead Scraper.app" /Applications/
+```
+
+The built app is self-contained (bundles Python + all dependencies, ~200MB)
+and doesn't need the venv or Terminal to run afterwards. Rebuild it with the
+same command any time `app.py` or its imports change — `dist/` and `build/`
+are gitignored since they're regenerated output, not source.
+
 ## 2b. Run as a browser app (a link you can open)
 
 ```bash
@@ -61,7 +80,10 @@ search) and **Browse Excel** (upload any spreadsheet and filter it by column).
 - **Business type / keyword** + **Location** — both required, e.g. "dentist"
   + "Dubai, UAE". Location is geocoded first to find the search area.
 - **Max results** — caps how many results are kept per search.
-- **Only results with a website / phone number** — pre-filters low-quality rows.
+- Every matching result is kept regardless of whether it has a website or
+  phone number — those fields are just left blank when OSM doesn't have
+  them, rather than dropping the row. Use the filter bar after the search
+  (below) if you want to narrow down to only rows that have one.
 - **Find emails from websites** — after the search, the app visits each
   result's own website (homepage + likely contact/about pages) looking for a
   published email address. OSM occasionally has an email tagged directly on

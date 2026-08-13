@@ -2,7 +2,10 @@
 generic reader/writer for arbitrary uploaded spreadsheets (Browse Excel tab,
 and its Streamlit equivalent)."""
 import io
+import os
+import re
 
+import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -115,3 +118,37 @@ def read_excel(filepath):
         return columns, rows
     finally:
         wb.close()
+
+
+def read_tsv(filepath):
+    """Reads a tab-separated .tsv file via pandas. `filepath` may be a path
+    string or a file-like object (e.g. a Streamlit UploadedFile). Returns
+    (columns, rows) in the same shape as read_excel: columns is the header
+    row as strings in order, rows is a list of dicts keyed by those
+    headers. Blank rows are skipped; blank header cells get a placeholder
+    name so every column stays addressable."""
+    df = pd.read_csv(filepath, sep="\t", dtype=str, keep_default_na=False)
+
+    columns = [
+        f"Column {i + 1}" if re.match(r"^Unnamed: \d+$", str(col)) else str(col)
+        for i, col in enumerate(df.columns)
+    ]
+    df.columns = columns
+
+    if len(df.columns) > 0:
+        df = df.loc[~(df == "").all(axis=1)]
+
+    return columns, df.to_dict(orient="records")
+
+
+def read_table(filepath, filename: str = None):
+    """Reads an uploaded table file, dispatching on extension to read_excel
+    (.xlsx) or read_tsv (.tsv). `filepath` may be a path string or a
+    file-like object; pass `filename` when `filepath` itself has no usable
+    extension (as with a Streamlit UploadedFile). Returns (columns, rows)
+    in the same shape as read_excel/read_tsv."""
+    name = filename or (filepath if isinstance(filepath, str) else "")
+    ext = os.path.splitext(name)[1].lower()
+    if ext == ".tsv":
+        return read_tsv(filepath)
+    return read_excel(filepath)
