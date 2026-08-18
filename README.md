@@ -93,13 +93,30 @@ search) and **Browse Excel** (upload any spreadsheet and filter it by column).
   guessed.
 - Once results load, use the filter bar (free-text search, city dropdown,
   country dropdown, size-signal dropdown) to narrow down what you see, then
-  click **Export visible rows to Excel** — the save dialog opens in the
-  `leads/` folder by default.
+  click **Export visible rows to Excel** — the save dialog opens in your
+  chosen **Save folder** by default (see below).
+
+### Save folder
+
+Both the desktop app and the browser app let you pick where exports go,
+instead of a fixed location:
+
+- **Desktop app** — the sidebar shows the current **Save folder** with a
+  **Change save folder...** button; pick any folder and it's remembered
+  for next time.
+- **Browser app** — a **Save folder** box in the left sidebar; type or
+  paste a path and it's remembered the same way (only meaningful when
+  running locally — see the caption next to "Save to folder" for the
+  hosted-link caveat).
+
+The choice is saved to `~/Library/Application Support/Lead
+Scraper/config.json` and persists across restarts. It defaults to `~/Documents/Lead
+Scraper Leads` the first time you run it.
 
 ## 3. Browse Excel tab
 
-Click **Upload Excel...** and pick any `.xlsx` file — leads you exported
-earlier, or any other spreadsheet. The app reads its header row and builds
+Click **Upload Excel/TSV...** and pick any `.xlsx` or `.tsv` file — leads you
+exported earlier, or any other spreadsheet. The app reads its header row and builds
 the results table with whatever columns that file has (not fixed to the
 leads schema).
 

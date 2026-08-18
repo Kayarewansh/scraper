@@ -12,18 +12,32 @@ import os
 import pandas as pd
 import streamlit as st
 
+import config
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import COLUMNS as LEADS_COLUMNS, export_to_excel, export_generic, read_table, leads_workbook_bytes, generic_workbook_bytes
 from condition_utils import CONDITION_OPERATORS, row_matches, is_numeric_column
 
-LEADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "leads")
-os.makedirs(LEADS_DIR, exist_ok=True)
-
 ENRICH_WORKERS = 6
 
 st.set_page_config(page_title="Lead Scraper", layout="wide")
 st.title("Lead Scraper")
+
+st.sidebar.markdown("**Save folder**")
+st.sidebar.caption("Where \"Save to folder\" writes .xlsx files on this machine.")
+save_dir = st.sidebar.text_input(
+    "Save folder", value=config.load_save_folder(), label_visibility="collapsed", key="save_folder"
+)
+if save_dir.strip():
+    try:
+        os.makedirs(save_dir, exist_ok=True)
+        config.save_save_folder(save_dir)
+        LEADS_DIR = save_dir
+    except OSError as e:
+        st.sidebar.error(f"Can't use that folder: {e}")
+        LEADS_DIR = config.load_save_folder()
+else:
+    LEADS_DIR = config.load_save_folder()
 
 tab_search, tab_browse = st.tabs(["Search", "Browse Excel"])
 
@@ -130,15 +144,16 @@ with tab_search:
         st.dataframe(pd.DataFrame(display_rows), use_container_width=True, height=420)
 
         ec1, ec2 = st.columns(2)
-        if ec1.button("Save to leads/ folder"):
+        if ec1.button("Save to folder"):
             stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
             path = os.path.join(LEADS_DIR, f"leads_{stamp}.xlsx")
             export_to_excel(filtered, path)
             st.success(f"Saved {len(filtered)} rows to {path}")
         st.caption(
-            "\"Save to leads/ folder\" writes on whatever machine is running this app — your Mac if you're "
-            "running it locally, or a temporary cloud filesystem if you're using the hosted link (which won't "
-            "persist). \"Download .xlsx\" always saves to your own computer, so prefer that on the hosted version."
+            "\"Save to folder\" writes to the Save folder set in the sidebar, on whatever machine is running "
+            "this app — your Mac if you're running it locally, or a temporary cloud filesystem if you're using "
+            "the hosted link (which won't persist). \"Download .xlsx\" always saves to your own computer, so "
+            "prefer that on the hosted version."
         )
         ec2.download_button(
             "Download .xlsx",
@@ -230,14 +245,15 @@ with tab_browse:
         st.dataframe(pd.DataFrame(filtered_rows, columns=columns), use_container_width=True, height=420)
 
         ec1, ec2 = st.columns(2)
-        if ec1.button("Save to leads/ folder", key="browse_save"):
+        if ec1.button("Save to folder", key="browse_save"):
             stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
             path = os.path.join(LEADS_DIR, f"filtered_{stamp}.xlsx")
             export_generic(filtered_rows, columns, path)
             st.success(f"Saved {len(filtered_rows)} rows to {path}")
         st.caption(
-            "\"Save to leads/ folder\" writes on whatever machine is running this app — prefer "
-            "\"Download .xlsx\" if you're using the hosted link, since that always saves to your own computer."
+            "\"Save to folder\" writes to the Save folder set in the sidebar, on whatever machine is running "
+            "this app — prefer \"Download .xlsx\" if you're using the hosted link, since that always saves to "
+            "your own computer."
         )
         ec2.download_button(
             "Download .xlsx",

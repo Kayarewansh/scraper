@@ -11,6 +11,7 @@ from tkinter import ttk, filedialog, messagebox
 
 import customtkinter as ctk
 
+import config
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import export_to_excel, export_generic, read_table
@@ -18,9 +19,6 @@ from condition_utils import CONDITION_OPERATORS, row_matches, is_numeric_column
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
-
-LEADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "leads")
-os.makedirs(LEADS_DIR, exist_ok=True)
 
 SEARCH_COLUMNS = [
     ("company", "Company Name", 180),
@@ -49,6 +47,7 @@ class App(ctk.CTk):
         self.msg_queue = queue.Queue()
         self.all_results = []  # full unfiltered search-tab result rows
         self.search_running = False
+        self.save_dir = config.load_save_folder()
 
         self.browse_columns = []  # ordered header list from the uploaded file
         self.browse_all_rows = []
@@ -165,6 +164,17 @@ class App(ctk.CTk):
         )
         self.status_label.pack(padx=16, pady=(6, 0), anchor="w")
 
+        ctk.CTkLabel(sidebar, text="Save folder", **_lbl()).pack(padx=16, pady=(14, 0), anchor="w")
+        self.save_dir_label = ctk.CTkLabel(
+            sidebar, text=self.save_dir, font=ctk.CTkFont(size=10), text_color="gray60",
+            wraplength=260, justify="left",
+        )
+        self.save_dir_label.pack(padx=16, pady=(2, 0), anchor="w")
+        ctk.CTkButton(
+            sidebar, text="Change save folder...", fg_color="#4B5563", hover_color="#374151",
+            command=self._choose_save_folder,
+        ).pack(padx=16, pady=(6, 0), fill="x")
+
         ctk.CTkLabel(
             sidebar,
             text=(
@@ -177,6 +187,14 @@ class App(ctk.CTk):
             wraplength=260,
             justify="left",
         ).pack(side="bottom", padx=16, pady=16, anchor="w")
+
+    def _choose_save_folder(self):
+        folder = filedialog.askdirectory(title="Choose a folder to save exports to", initialdir=self.save_dir)
+        if not folder:
+            return
+        self.save_dir = folder
+        config.save_save_folder(folder)
+        self.save_dir_label.configure(text=folder)
 
     def _build_search_main(self, parent):
         main = ctk.CTkFrame(parent, corner_radius=0, fg_color="transparent")
@@ -404,7 +422,7 @@ class App(ctk.CTk):
         filepath = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel workbook", "*.xlsx")],
-            initialdir=LEADS_DIR,
+            initialdir=self.save_dir,
             initialfile="leads.xlsx",
         )
         if not filepath:
@@ -480,7 +498,7 @@ class App(ctk.CTk):
         filepath = filedialog.askopenfilename(
             title="Upload Excel or TSV file",
             filetypes=[("Excel or TSV", "*.xlsx *.tsv"), ("Excel workbook", "*.xlsx"), ("TSV file", "*.tsv")],
-            initialdir=LEADS_DIR,
+            initialdir=self.save_dir,
         )
         if not filepath:
             return
@@ -636,7 +654,7 @@ class App(ctk.CTk):
         filepath = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel workbook", "*.xlsx")],
-            initialdir=LEADS_DIR,
+            initialdir=self.save_dir,
             initialfile="filtered.xlsx",
         )
         if not filepath:
