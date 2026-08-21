@@ -131,7 +131,9 @@ Filter it with:
   a threshold that isn't already in the data (e.g. "Revenue > 250000" even
   if no row is exactly 250000). Greater/Less than just won't match on a
   non-numeric column rather than erroring. Stack as many conditions as you
-  like — they combine with AND. Each has a **✕** to remove just that one.
+  like, and choose **AND** (every condition must match) or **OR** (any
+  condition matches) to combine them — one choice applies to the whole
+  stack, not per pair. Each condition has a **✕** to remove just that one.
 - **Free-text search** — matches across every column at once, on top of
   whatever conditions are set.
 

@@ -15,7 +15,7 @@ import config
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import export_to_excel, export_generic, read_table
-from condition_utils import CONDITION_OPERATORS, row_matches, is_numeric_column
+from condition_utils import CONDITION_OPERATORS, is_numeric_column, filter_rows
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -457,7 +457,8 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(
             parent,
-            text="Add conditions to filter to rows where a column equals a specific value. Combine as many as you like.",
+            text="Add conditions to filter to rows where a column equals a specific value. "
+            "Choose AND (all conditions must match) or OR (any condition matches).",
             font=ctk.CTkFont(size=10),
             text_color="gray50",
         ).grid(row=1, column=0, sticky="w", padx=16, pady=(6, 0))
@@ -478,9 +479,19 @@ class App(ctk.CTk):
         self.browse_conditions_container = ctk.CTkFrame(parent, fg_color="transparent")
         self.browse_conditions_container.grid(row=3, column=0, sticky="we", padx=16, pady=(8, 0))
 
-        ctk.CTkButton(parent, text="+ Add condition", width=140, command=self._add_browse_condition).grid(
-            row=4, column=0, sticky="w", padx=16, pady=(4, 0)
+        condition_controls = ctk.CTkFrame(parent, fg_color="transparent")
+        condition_controls.grid(row=4, column=0, sticky="w", padx=16, pady=(4, 0))
+        ctk.CTkButton(
+            condition_controls, text="+ Add condition", width=140, command=self._add_browse_condition
+        ).pack(side="left")
+        ctk.CTkLabel(condition_controls, text="Combine with:", font=ctk.CTkFont(size=11), text_color="gray60").pack(
+            side="left", padx=(16, 8)
         )
+        self.browse_combine_var = ctk.StringVar(value="AND")
+        ctk.CTkSegmentedButton(
+            condition_controls, values=["AND", "OR"], variable=self.browse_combine_var,
+            command=lambda *_: self._apply_browse_filters(),
+        ).pack(side="left")
 
         table_frame = ctk.CTkFrame(parent, fg_color="#111827")
         table_frame.grid(row=5, column=0, sticky="nswe", padx=16, pady=(8, 8))
@@ -618,16 +629,13 @@ class App(ctk.CTk):
     def _clear_browse_filters(self):
         self.browse_text_var.set("")
         self.browse_conditions = []
+        self.browse_combine_var.set("AND")
         self._render_browse_conditions()
         self._apply_browse_filters()
 
     def _apply_browse_filters(self):
         text = self.browse_text_var.get().strip().lower()
-        rows = self.browse_all_rows
-
-        for cond in self.browse_conditions:
-            if cond["column"] and cond["value"]:
-                rows = [r for r in rows if row_matches(r, cond["column"], cond["operator"], cond["value"])]
+        rows = filter_rows(self.browse_all_rows, self.browse_conditions, self.browse_combine_var.get())
 
         if text:
             rows = [

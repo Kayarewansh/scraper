@@ -55,3 +55,16 @@ def row_matches(row: dict, column: str, operator: str, value) -> bool:
             return False
         return cell_num > value_num if operator == "Greater than" else cell_num < value_num
     return True
+
+
+def filter_rows(rows: list, conditions: list, combine: str = "AND") -> list:
+    """Filters `rows` by a list of {"column", "operator", "value"} dicts,
+    combined with AND (every condition must match) or OR (any condition
+    matches). Conditions with no column or no value set are ignored,
+    matching the previous behavior of skipping incomplete conditions."""
+    active = [c for c in conditions if c.get("column") and c.get("value") not in (None, "")]
+    if not active:
+        return rows
+    if combine == "OR":
+        return [r for r in rows if any(row_matches(r, c["column"], c["operator"], c["value"]) for c in active)]
+    return [r for r in rows if all(row_matches(r, c["column"], c["operator"], c["value"]) for c in active)]

@@ -16,7 +16,7 @@ import config
 from overpass_api import OverpassClient, OverpassError
 from enrichment import find_contact_info
 from excel_export import COLUMNS as LEADS_COLUMNS, export_to_excel, export_generic, read_table, leads_workbook_bytes, generic_workbook_bytes
-from condition_utils import CONDITION_OPERATORS, row_matches, is_numeric_column
+from condition_utils import CONDITION_OPERATORS, is_numeric_column, filter_rows
 
 ENRICH_WORKERS = 6
 
@@ -196,7 +196,11 @@ with tab_browse:
 
         text_query = st.text_input("Filter (any column)", key="browse_text_filter")
 
-        st.markdown("**Conditions** — filter to rows matching a column/condition/value. Combine as many as you like.")
+        cond_header, cond_combine = st.columns([4, 2])
+        cond_header.markdown("**Conditions** — filter to rows matching a column/condition/value.")
+        combine_mode = cond_combine.radio(
+            "Combine with", ["AND", "OR"], key="browse_combine", horizontal=True, label_visibility="collapsed"
+        )
         conditions = st.session_state.setdefault("browse_conditions", [])
 
         remove_idx = None
@@ -233,10 +237,7 @@ with tab_browse:
             conditions.append({"column": default_col, "operator": "Equals", "value": default_vals[0] if default_vals else None})
             st.rerun()
 
-        filtered_rows = rows
-        for cond in conditions:
-            if cond.get("column") and cond.get("value") is not None:
-                filtered_rows = [r for r in filtered_rows if row_matches(r, cond["column"], cond["operator"], cond["value"])]
+        filtered_rows = filter_rows(rows, conditions, combine_mode)
         if text_query.strip():
             q = text_query.strip().lower()
             filtered_rows = [r for r in filtered_rows if q in " ".join(str(r.get(c, "")) for c in columns).lower()]
